@@ -702,8 +702,7 @@ class Terminal:
             f = getattr(self, 'leave_%s' % self.state, None)
             if f is not None:
                 f(self.next_state)
-        self.next_state, self.state, self.prev_state = (None,
-                self.next_state, self.state)
+        self.next_state, self.state, self.prev_state = (None, self.next_state, self.state)
         if self.state != self.prev_state:
             f = getattr(self, 'enter_%s' % self.state, None)
             if f is not None:
