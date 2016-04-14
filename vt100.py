@@ -2361,11 +2361,10 @@ class Terminal:
 
 def remove_script_lines(text):
     """Remove the starting and ending lines produced by script(1)."""
-    script_re = re.compile(r'^Script (started|done) on \w+ \d+ \w+ \d{4} '
-            r'\d\d:\d\d:\d\d \w+ \w+$')
+    script_re = re.compile(r'^Script (started|done) on .*')
     try:
         first_newline = text.index(b'\n')
-        first_line = text[:first_newline].decode('ascii')
+        first_line = text[:first_newline].decode('utf8')
     except (ValueError, UnicodeDecodeError):
         pass
     else:
@@ -2373,13 +2372,13 @@ def remove_script_lines(text):
             text = text[first_newline+1:]
     try:
         last_newline = text.rstrip().rindex(b'\n')
-        last_line = text[last_newline+1:].decode('ascii')
+        last_line = text[last_newline+1:].decode('utf8')
     except (ValueError, UnicodeDecodeError):
         pass
     else:
         if script_re.match(last_line):
             text = text[:last_newline]
-    return text
+    return text.lstrip()
 
 
 def detect_geometry():
