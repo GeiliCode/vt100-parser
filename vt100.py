@@ -192,7 +192,7 @@ class TextFormatter:
         out = []
         for line in lines:
             bline = bytes(line)
-            if len(bline) > 0 and len(bline.strip()) / len(bline) > 0.05:
+            if len(bline) > 0 and len(bline.strip()) / len(bline) > 0.1:
                 try:
                     out.append(bline.decode('utf8'))
                 except:
