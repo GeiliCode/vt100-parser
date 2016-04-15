@@ -189,18 +189,16 @@ class TextFormatter:
 
     def format(self, lines):
         """Return a stringification of the given lines."""
-        out = [self.format_line(line) for line in lines]
+        out = []
+        for line in lines:
+            bline = bytes(line)
+            if len(bline) > 0 and len(bline.strip()) / len(bline) > 0.05:
+                try:
+                    out.append(bline.decode('utf8'))
+                except:
+                    print(bline, file=sys.stderr)
         out.append('')
         return self.eol.join(out)
-
-    def format_line(self, line):
-        """Return the given line (sequence of Characters) formatted as
-        a string (without an EOL character)."""
-        try:
-            return bytes(line).decode('utf8')
-        except:
-            print(bytes(line), file=sys.stderr)
-            return ''
 
 
 class InvalidParameterListError(RuntimeError):
