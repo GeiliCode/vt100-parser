@@ -159,59 +159,15 @@ Thanks to http://vt100.net for lots of helpful information, especially the
 DEC-compatible parser page.
 """
 
-# Requires Python 2.6
-from __future__ import print_function
+# Requires Python 3.5
 
-__version__ = "0.4-git"
-__author__ = "Mark Lodato"
-
-__license__ = """
-Copyright (c) 2010 Mark Lodato
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-"""
-
-import collections
 import itertools
 import os.path
 import re
 import subprocess
 import sys
 from optparse import OptionParser, OptionGroup
-try:
-    from ConfigParser import SafeConfigParser as ConfigParser
-except ImportError:
-    from configparser import ConfigParser
-try:
-    from io import StringIO
-except ImportError:
-    try:
-        from cStringIO import StringIO
-    except ImportError:
-        from StringIO import StringIO
-
-
-if sys.version_info[0] == 2:
-    __metaclass__ = type
-    map = itertools.imap
-    range = xrange
-
+from configparser import ConfigParser
 
 class TextFormatter:
     """Terminal formatter for plain text output."""
@@ -232,191 +188,14 @@ class TextFormatter:
 
     def format(self, lines):
         """Return a stringification of the given lines."""
-        out = []
-        out.extend(self.begin())
-        out.extend(self.format_line(line) for line in lines)
-        out.extend(self.end())
-        out.append('')
+        out = [self.format_line(line) for line in lines]
         return self.eol.join(out)
-
-    def begin(self):
-        """Return a list of lines to be output before the formatted lines."""
-        return []
 
     def format_line(self, line):
         """Return the given line (sequence of Characters) formatted as
         a string (without an EOL character)."""
-        return ''.join(x.char for x in line)
+        return bytes(line).decode('utf8')
 
-    def end(self):
-        """Return a list of lines to be output after the formatted lines."""
-        return []
-
-
-class HtmlFormatter (TextFormatter):
-    """Terminal formatter for HTML output."""
-
-    attr_map = {
-            # 'fg_color' and 'bg_color' set by init()
-            ('weight', 'bold') : 'font-weight: bold',
-            ('weight', 'feint') : 'font-weight: lighter',
-            ('underline', 'single') : 'text-decoration: underline',
-            ('underline', 'double') : ('text-decoration: underline; '
-                                       'border-bottom: 1px solid'),
-            ('style', 'italic') : 'font-style: italic',
-            ('blink', 'rapid') : 'text-decoration: blink',
-            ('blink', 'slow') : 'text-decoration: blink', # no fast or slow
-            ('hidden', True) : 'visibility: hidden',
-            ('strikeout', True) : 'text-decoration: line-through',
-            ('overline', True)  : 'text-decoration: overline',
-            # TODO frame
-            }
-
-    escapes = {
-            '&' : '&amp;',
-            '<' : '&lt;',
-            '>' : '&gt;',
-            }
-
-    default_options = {
-            'foreground' : '',
-            'background' : '',
-            'inverse_fg' : 'white',
-            'inverse_bg' : 'black',
-            }
-
-    # [black, red, green, brown/yellow, blue, magenta, cyan, white]
-    # Colors used by xterm (before patch #192, blues were #0000cd and #0000ff)
-    color_16 = ['#000000', '#cd0000', '#00cd00', '#cdcd00',
-                '#0000e8', '#cd00cd', '#00cdcd', '#e5e5e5',
-                '#7f7f7f', '#ff0000', '#00ff00', '#ffff00',
-                '#5c5cff', '#ff00ff', '#00ffff', '#ffffff']
-
-    def init(self):
-        self.init_colors()
-        self.attr_map = self.__class__.attr_map.copy()
-        self.options = self.__class__.default_options.copy()
-        for index, value in enumerate(self.color_256):
-            self.set_color(index, value)
-
-    def init_colors(self):
-        def create_color_table(color_scale, gray_scale):
-            table = self.color_16[:16]
-            for r, g, b in itertools.product(color_scale, repeat=3):
-                table.append('#%02x%02x%02x' % (r,g,b))
-            for g in gray_scale:
-                table.append('#%02x%02x%02x' % (g,g,g))
-            return table
-        self.color_256 = create_color_table([0, 95, 135, 175, 215, 255],
-                [i*10 + 8 for i in range(24)])
-        self.color_88 = create_color_table([0, 139, 205, 255],
-                [46, 92, 113, 139, 162, 185, 208, 231])
-
-    def set_color(self, index, value):
-        self.attr_map['fg_color', index] = 'color: %s' % value
-        self.attr_map['bg_color', index] = 'background-color: %s' % value
-
-    def parse_config(self, config):
-        self._parse_config(config, config.initial_section, set())
-        if self.options['foreground']:
-            self.options['inverse_bg'] = self.options['foreground']
-        if self.options['background']:
-            self.options['inverse_fg'] = self.options['background']
-
-    def _parse_config(self, config, section, seen):
-        if config.has_option(section, 'colorscheme'):
-            scheme = config.get(section, 'colorscheme')
-            if scheme not in seen:
-                if config.has_section(scheme):
-                    seen.add(scheme)
-                    self._parse_config(config, scheme, seen)
-                else:
-                    print('warning: colorscheme "%s" not found' % scheme,
-                            file=sys.stderr)
-            else:
-                print('warning: recursion in color scheme: [%s] -> %s'
-                        % (section, scheme), file=sys.stderr)
-        for i in range(256):
-            key = 'color%d'%i
-            if config.has_option(section, key):
-                self.set_color(i, config.get(section, key))
-        for key in self.options:
-            if config.has_option(section, key):
-                value = config.get(section, key)
-                self.options[key] = value
-
-    def _compute_style(self, attr):
-        # TODO implement inverse
-        out = []
-        if attr.pop('inverse', None):
-            fg = attr.pop('fg_color', None)
-            bg = attr.pop('bg_color', None)
-            if fg is not None:
-                attr['bg_color'] = fg
-            else:
-                out.append('background-color: %s' % self.options['inverse_bg'])
-            if bg is not None:
-                attr['fg_color'] = bg
-            else:
-                out.append('color: %s' % self.options['inverse_fg'])
-        for key in sorted(attr):
-            value = attr[key]
-            try:
-                out.append( self.attr_map[key, value] )
-            except KeyError:
-                # TODO verbose option?
-                print('unknown attribute: %s:%s' % (key, value),
-                        file=sys.stderr)
-        return '; '.join(out)
-
-    def begin(self):
-        style = []
-        if self.options['foreground']:
-            style.append('color: %s' % self.options['foreground'])
-        if self.options['background']:
-            style.append('background-color: %s' % self.options['background'])
-        if style:
-            attribute = ' style="%s"' % '; '.join(style)
-        else:
-            attribute = ''
-        return ['<pre%s>' % attribute]
-
-    def format_line(self, line):
-        out = []
-        last_style = ''
-        for c in line:
-            style = self._compute_style(c.attr)
-            if style != last_style:
-                if last_style:
-                    out.append('</span>')
-                if style:
-                    out.append('<span style="%s">' % style)
-                last_style = style
-            char = self.escapes.get(c.char, c.char)
-            out.append(char)
-        if last_style:
-            out.append('</span>')
-        return ''.join(out)
-
-    def end(self):
-        return ['</pre>']
-
-
-formatters = {
-        'text' : TextFormatter,
-        'html' : HtmlFormatter,
-        }
-
-
-class Character:
-    """A single character along with an associated attribute."""
-    def __init__(self, char, attr = {}):
-        self.char = char
-        self.attr = attr
-    def __repr__(self):
-        return "<'%s'>" % (str(self.char))
-    def __str__(self):
-        return str(self.char)
 
 class InvalidParameterListError (RuntimeError):
     pass
@@ -544,8 +323,7 @@ class Terminal:
 
     # ---------- Constructor ----------
 
-    def __init__(self, height=24, width=80, verbosity=False,
-            formatter=TextFormatter()):
+    def __init__(self, height=24, width=80, verbosity=False, formatter=TextFormatter()):
         self.verbosity = verbosity
         self.width = width
         self.height = height
@@ -620,7 +398,6 @@ class Terminal:
                 self.NEL()
             else:
                 self.col = self.width - 1
-        c = Character(c, self.attr.copy())
         if self.insert_mode:
             self.screen.shift_row(self.row, self.col)
         self.screen[self.pos] = c
@@ -665,7 +442,7 @@ class Terminal:
 
     def collect(self, c):
         """Record the character as an intermediate."""
-        self.collected += c
+        self.collected += chr(c)
 
     def clear_on_enter(self, old_state):
         """Since most enter_* functions just call self.clear(), this is a
@@ -686,8 +463,6 @@ class Terminal:
 
     def parse_single(self, c):
         """Parse a single character."""
-        if isinstance(c, int):
-            c = chr(c)
         try:
             f = getattr(self, 'parse_%s' % self.state)
         except AttributeError:
@@ -710,7 +485,7 @@ class Terminal:
 
     def parse_ground(self, c):
         self.previous, self.current = self.current, c
-        if ord(c) < 0x20:
+        if c < 0x20:
             self.execute(c)
         else:
             self.output(c)
@@ -749,7 +524,7 @@ class Terminal:
             if x is not None:
                 return x
             else:
-                return Character(' ')
+                return 0x20
         def is_None(x):
             return x is None
         return list(map(convert_to_blank, self.drop_end(is_None, line)))
@@ -789,17 +564,17 @@ class Terminal:
         elif r is NoNeedToImplement:
             self.debug(1, 'ignoring command: %s' % f.__name__)
 
-    @command('\x00')        # ^@
+    @command(0x00)        # ^@
     def NUL(self, c=None):
         """NULl"""
         pass
 
-    @command('\x07')        # ^G
+    @command(0x07)        # ^G
     def BEL(self, c=None):
         """Bell"""
         pass
 
-    @command('\x08')        # ^H
+    @command(0x08)        # ^H
     def BS(self, c=None):
         """Backspace"""
         self.clip_column()
@@ -812,7 +587,7 @@ class Terminal:
             else:
                 self.row = self.height - 1
 
-    @command('\x09')        # ^I
+    @command(0x09)        # ^I
     def HT(self, c=None):
         """Horizontal Tab"""
         while self.col < self.width-1:
@@ -820,7 +595,7 @@ class Terminal:
             if self.tabstops[self.col]:
                 break
 
-    @command('\x0a')        # ^J
+    @command(0x0a)        # ^J
     def LF(self, c=None):
         """Line Feed"""
         if self.new_line_mode:
@@ -828,32 +603,32 @@ class Terminal:
         else:
             self.IND()
 
-    @command('\x0b')        # ^K
+    @command(0x0b)        # ^K
     def VT(self, c=None):
         """Vertical Tab"""
         self.LF(c)
 
-    @command('\x0c')        # ^L
+    @command(0x0c)        # ^L
     def FF(self, c=None):
         """Form Feed"""
         self.LF(c)
 
-    @command('\x0d')        # ^M
+    @command(0x0d)        # ^M
     def CR(self, c=None):
         """Carriage Return"""
         self.col = 0
 
-    @command('\x18')        # ^X
+    @command(0x18)        # ^X
     def CAN(self, c=None):
         """Cancel"""
         self.next_state = 'ground'
 
-    @command('\x1a')        # ^Z
+    @command(0x1a)        # ^Z
     def SUB(self, c=None):
         """Substitute"""
         self.next_state = 'ground'
 
-    @command('\x1b')        # ^[
+    @command(0x1b)        # ^[
     def ESC(self, c=None):
         """Escape"""
         self.next_state = 'escape'
@@ -864,17 +639,18 @@ class Terminal:
     enter_escape = clear_on_enter
 
     def parse_escape(self, c):
-        if ord(c) < 0x20:
+        if c < 0x20:
             self.execute(c)
-        elif ord(c) < 0x30:
+        elif c < 0x30:
             self.collect(c)
-        elif ord(c) < 0x7f:
+        elif c < 0x7f:
             self.next_state = 'ground'
             self.dispatch_escape(c)
         else:
             self.ignore(c)
 
     def dispatch_escape(self, c):
+        c = chr(c)
         command = self.collected + c
         name = self.escape_sequences.get(c, None)
         f = None
@@ -987,11 +763,11 @@ class Terminal:
     enter_control_sequence = clear_on_enter
 
     def parse_control_sequence(self, c):
-        if ord(c) < 0x20:
+        if c < 0x20:
             self.execute(c)
-        elif ord(c) < 0x40:
+        elif c < 0x40:
             self.collect(c)
-        elif ord(c) < 0x7f:
+        elif c < 0x7f:
             self.next_state = 'ground'
             self.dispatch_control_sequence(c)
         else:
@@ -1043,7 +819,7 @@ class Terminal:
         self.clip_column()
         r = self.row
         c = self.col
-        self.screen.shift_row(r, c, amount=n, fill=Character(' '))
+        self.screen.shift_row(r, c, amount=n, fill=0x20)
 
     @control('A')
     def CUU(self, command=None, param=None):
@@ -1461,18 +1237,18 @@ class Terminal:
 
     def parse_control_string(self, c):
         # Consume the whole string and pass it to the process function.
-        if c in '\x18\x1a':
+        if c in  (0x18, 0x1a):
             # CAN and SUB quit the string
             self.cancel_control_string()
             # should we self.execute(c) ?
-        elif c == '\x07' and self.state == 'osc':
+        elif c == 0x07 and self.state == 'osc':
             # NOTE: xterm ends OSC with BEL, in addition to ESC \
             self.finish_control_string()
-        elif self.collected and self.collected[-1] == '\x1b':
+        elif self.collected and ord(self.collected[-1]) == 0x1b:
             # NOTE: xterm consumes the character after the ESC always, but
             # only process it if it is '\'.  Not sure about VTxxx.
             self.collected = self.collected[:-1]
-            if c == '\x5c':
+            if c == 0x5c:
                 self.finish_control_string()
             else:
                 self.cancel_control_string()
@@ -1609,17 +1385,17 @@ class Terminal:
     #             Things implemented by xterm but not here.
     # ================================================================
 
-    @command('\x05')       # ^E
+    @command(0x05)       # ^E
     def ENQ(self, c=None):
         """Enquiry"""
         return NoNeedToImplement
 
-    @command('\x0e')       # ^N
+    @command(0x0e)       # ^N
     def SO(self, c=None):
         """Shift Out (LS1)"""
         return NotImplemented
 
-    @command('\x0f')       # ^O
+    @command(0x0f)       # ^O
     def SI(self, c=None):
         """Shift In (LS0)"""
         return NotImplemented
@@ -1992,92 +1768,92 @@ class Terminal:
     #                  Things not implemented by xterm.
     # ================================================================
 
-    @command('\x01')        # ^A
+    @command(0x01)        # ^A
     def SOH(self, c=None):
         """Start Of Heading"""
         return NotImplemented
 
-    @command('\x02')        # ^B
+    @command(0x02)        # ^B
     def STX(self, c=None):
         """Start of TeXt"""
         return NotImplemented
 
-    @command('\x03')        # ^C
+    @command(0x03)        # ^C
     def ETX(self, c=None):
         """End of TeXt"""
         return NotImplemented
 
-    @command('\x04')        # ^D
+    @command(0x04)        # ^D
     def EOT(self, c=None):
         """End Of Transmission"""
         return NotImplemented
 
-    @command('\x06')        # ^F
+    @command(0x06)        # ^F
     def ACK(self, c=None):
         """ACKnowledge"""
         return NotImplemented
 
-    @command('\x10')        # ^P
+    @command(0x10)        # ^P
     def DLE(self, c=None):
         """Data Link Escape"""
         return NotImplemented
 
-    @command('\x11')        # ^Q
+    @command(0x11)        # ^Q
     def DC1(self, c=None):
         """Device Control 1"""
         return NotImplemented
 
-    @command('\x12')        # ^R
+    @command(0x12)        # ^R
     def DC2(self, c=None):
         """Device Control 2"""
         return NotImplemented
 
-    @command('\x13')        # ^S
+    @command(0x13)        # ^S
     def DC3(self, c=None):
         """Device Control 3"""
         return NotImplemented
 
-    @command('\x14')        # ^T
+    @command(0x14)        # ^T
     def DC4(self, c=None):
         """Device Control 4"""
         return NotImplemented
 
-    @command('\x15')        # ^U
+    @command(0x15)        # ^U
     def NAK(self, c=None):
         """Negative AcKnowledge"""
         return NotImplemented
 
-    @command('\x16')        # ^V
+    @command(0x16)        # ^V
     def SYN(self, c=None):
         """SYNchronous idle"""
         return NotImplemented
 
-    @command('\x17')        # ^W
+    @command(0x17)        # ^W
     def ETB(self, c=None):
         """End of Transmission Block"""
         return NotImplemented
 
-    @command('\x19')        # ^Y
+    @command(0x19)        # ^Y
     def EM(self, c=None):
         """End of Medium"""
         return NotImplemented
 
-    @command('\x1c')        # ^\
+    @command(0x1c)        # ^\
     def FS(self, c=None):
         """File Separator (IS4)"""
         return NotImplemented
 
-    @command('\x1d')        # ^]
+    @command(0x1d)        # ^]
     def GS(self, c=None):
         """Group Separator (IS3)"""
         return NotImplemented
 
-    @command('\x1e')        # ^^
+    @command(0x1e)        # ^^
     def RS(self, c=None):
         """Record Separator (IS2)"""
         return NotImplemented
 
-    @command('\x1f')        # ^_
+    @command(0x1f)        # ^_
     def US(self, c=None):
         """Unit Separator (IS1)"""
         return NotImplemented
@@ -2436,8 +2212,7 @@ class SimpleConfigParser (ConfigParser):
 def main():
 
     usage = "%prog [OPTIONS] [-f FORMAT] [-g WxH] (filename|-)"
-    version = "%%prog %s" % __version__
-    parser = OptionParser(usage=usage, version=version)
+    parser = OptionParser(usage=usage)
     parser.add_option('--man', action='store_true', default=False,
             help='show the manual page and exit')
     parser.add_option('-f', '--format', choices=('text','html'),
@@ -2472,7 +2247,7 @@ def main():
 
     defaults = {
             'format' : 'text',
-            'geometry' : '80x24',
+            'geometry' : '1000x1',
             'verbosity' : '0',
             }
     config = SimpleConfigParser(defaults)
@@ -2499,10 +2274,6 @@ def main():
         with open(filename, 'rb') as f:
             text = f.read()
 
-    if options.format is None:
-        options.format = config.get(None, 'format')
-    formatter = formatters[options.format](config=config)
-
     if options.geometry is None:
         options.geometry = config.get(None, 'geometry')
     if options.geometry == 'detect':
@@ -2513,8 +2284,7 @@ def main():
         except:
             parser.error('invalid format for --geometry: %s' % options.geometry)
 
-    t = Terminal(verbosity=options.verbose, formatter=formatter,
-                 width=cols, height=rows)
+    t = Terminal(verbosity=options.verbose, width=cols, height=rows)
     if not options.non_script:
         text = remove_script_lines(text)
     t.parse(text)
