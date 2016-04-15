@@ -767,8 +767,10 @@ class Terminal:
 
     @escape('c')
     def RIS(self, command=None, param=None):
-        """Reset to Initial State"""
-        self.reset()
+        """Reset to Initial State
+        rz/sz 时可能会出现该控制字符, 忽略"""
+        pass
+        # self.reset()
 
     # ---------- Control Sequences ----------
 
@@ -1026,7 +1028,7 @@ class Terminal:
     def REP(self, command=None, param=None):
         """Repeat"""
         n = param_list(param, 1)[0]
-        if ord(self.previous) >= 0x20:
+        if self.previous >= 0x20:
             for i in range(n):
                 self.output(self.previous)
 
