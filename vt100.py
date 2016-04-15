@@ -169,6 +169,7 @@ import sys
 from optparse import OptionParser, OptionGroup
 from configparser import ConfigParser
 
+
 class TextFormatter:
     """Terminal formatter for plain text output."""
 
@@ -197,12 +198,14 @@ class TextFormatter:
         return bytes(line).decode('utf8')
 
 
-class InvalidParameterListError (RuntimeError):
+class InvalidParameterListError(RuntimeError):
     pass
+
 
 def param_list(s, default, zero_is_default=True, min_length=1):
     """Return the list of integer parameters assuming `s` is a standard
     control sequence parameter list.  Empty elements are set to `default`."""
+
     def f(token):
         if not token:
             return default
@@ -212,6 +215,7 @@ def param_list(s, default, zero_is_default=True, min_length=1):
         if value < 0:
             raise ValueError
         return value
+
     if s is None:
         l = []
     else:
@@ -231,21 +235,24 @@ def clip(n, start, stop=None):
     if n < start:
         return start
     if n >= stop:
-        return stop-1
+        return stop - 1
     return n
 
 
 def new_sequence_decorator(dictionary):
     def decorator_generator(key):
         assert isinstance(key, (str, int))
+
         def decorator(f, key=key):
             dictionary[key] = f.__name__
             return f
+
         return decorator
+
     return decorator_generator
 
 
-class NoNeedToImplement (Exception):
+class NoNeedToImplement(Exception):
     """A function for which there is no need to implement."""
     pass
 
@@ -255,7 +262,7 @@ class Screen:
 
     def __init__(self, width, height):
         self.width = width
-        self.height= height
+        self.height = height
         self.clear()
 
     def __iter__(self):
@@ -296,17 +303,16 @@ class Screen:
         to `fill`."""
         row = self.rows[row]
         if amount > 0:
-            amount = min(amount, self.width-col)
-            row[col+amount:] = row[col:-amount]
-            row[col:col+amount] = [fill] * amount
+            amount = min(amount, self.width - col)
+            row[col + amount:] = row[col:-amount]
+            row[col:col + amount] = [fill] * amount
         else:
-            amount = min(-amount, self.width-col)
-            row[col:-amount] = row[col+amount:]
+            amount = min(-amount, self.width - col)
+            row[col:-amount] = row[col + amount:]
             row[-amount:] = [fill] * amount
 
 
 class Terminal:
-
     # ---------- Decorators for Defining Sequences ----------
 
     commands = {}
@@ -316,7 +322,7 @@ class Terminal:
     dec_modes = {}
 
     command = new_sequence_decorator(commands)
-    escape  = new_sequence_decorator(escape_sequences)
+    escape = new_sequence_decorator(escape_sequences)
     control = new_sequence_decorator(control_sequences)
     ansi_mode = new_sequence_decorator(ansi_modes)
     dec_mode = new_sequence_decorator(dec_modes)
@@ -350,7 +356,7 @@ class Terminal:
         self.margin_bottom = self.height - 1
         self.previous = '\0'
         self.current = '\0'
-        self.tabstops = [(i%8)==0 for i in range(self.width)]
+        self.tabstops = [(i % 8) == 0 for i in range(self.width)]
         self.attr = {}
         self.insert_mode = False
         self.new_line_mode = False
@@ -359,20 +365,22 @@ class Terminal:
         self.clear()
 
     default_cursor = {
-            'pos'           : (0, 0),
-            'attr'          : {},
-            'autowrap'      : True,
-            'reverse_wrap'  : False,
-            'origin_mode'   : False,
-            # TODO: pending SS2 or SS3
-            # TODO: selective erase
-            }
+        'pos': (0, 0),
+        'attr': {},
+        'autowrap': True,
+        'reverse_wrap': False,
+        'origin_mode': False,
+        # TODO: pending SS2 or SS3
+        # TODO: selective erase
+    }
 
     def _pos_get(self):
         """The cursor position as (row, column)."""
         return self.row, self.col
+
     def _pos_set(self, value):
         self.row, self.col = value
+
     pos = property(_pos_get, _pos_set)
 
     def is_alt_screen(self):
@@ -403,7 +411,7 @@ class Terminal:
         self.screen[self.pos] = c
         self.col += 1
 
-    def scroll(self, n, top = None, bottom = None, save = None):
+    def scroll(self, n, top=None, bottom=None, save=None):
         """Scroll the scrolling region n lines upward (data moves up) between
         rows top (inclusive, default 0) and bottom (exclusive, default
         height).  Any data moved off the top of the screen (if top is 0/None
@@ -417,24 +425,24 @@ class Terminal:
         s = self.screen
         if self.is_alt_screen():
             save = False
-        span = bottom-top
+        span = bottom - top
         if n > 0:
             # TODO transform history?
             if (save is None and top == 0) or save:
-                self.history.extend( s.rows[top:top+n] )
+                self.history.extend(s.rows[top:top + n])
                 if n > span:
                     extra = n - span
-                    self.history.extend( [[None]*self.width]*extra )
+                    self.history.extend([[None] * self.width] * extra)
             if n > span:
                 n = span
-            s.rows[top:bottom-n] = s.rows[top+n:bottom]
-            s.clear_rows(start=bottom-n, stop=bottom)
+            s.rows[top:bottom - n] = s.rows[top + n:bottom]
+            s.clear_rows(start=bottom - n, stop=bottom)
         elif n < 0:
             n = -n
             if n > span:
                 n = span
-            s.rows[top+n:bottom] = s.rows[top:bottom-n]
-            s.clear_rows(start=top, stop=top+n)
+            s.rows[top + n:bottom] = s.rows[top:bottom - n]
+            s.clear_rows(start=top, stop=top + n)
 
     def ignore(self, c):
         """Ignore the character."""
@@ -467,7 +475,7 @@ class Terminal:
             f = getattr(self, 'parse_%s' % self.state)
         except AttributeError:
             raise RuntimeError("internal error: unknown state %s" %
-                    repr(self.state))
+                               repr(self.state))
         self.next_state = self.state
         f(c)
         self.transition()
@@ -492,8 +500,7 @@ class Terminal:
 
     # ---------- Output ----------
 
-    def to_string(self, history=True, screen=True, remove_blank_end=True,
-            formatter=None):
+    def to_string(self, history=True, screen=True, remove_blank_end=True, formatter=None):
         """Return a string form of the history and the current screen."""
 
         # Concatenate the history and the screen, and fix each line.
@@ -520,13 +527,16 @@ class Terminal:
     def fixup_line(self, line):
         """Remove empty characters from the end of the line and change Nones
         to spaces with no attributes."""
+
         def convert_to_blank(x):
             if x is not None:
                 return x
             else:
                 return 0x20
+
         def is_None(x):
             return x is None
+
         return list(map(convert_to_blank, self.drop_end(is_None, line)))
 
     @staticmethod
@@ -564,17 +574,17 @@ class Terminal:
         elif r is NoNeedToImplement:
             self.debug(1, 'ignoring command: %s' % f.__name__)
 
-    @command(0x00)        # ^@
+    @command(0x00)  # ^@
     def NUL(self, c=None):
         """NULl"""
         pass
 
-    @command(0x07)        # ^G
+    @command(0x07)  # ^G
     def BEL(self, c=None):
         """Bell"""
         pass
 
-    @command(0x08)        # ^H
+    @command(0x08)  # ^H
     def BS(self, c=None):
         """Backspace"""
         self.clip_column()
@@ -587,15 +597,15 @@ class Terminal:
             else:
                 self.row = self.height - 1
 
-    @command(0x09)        # ^I
+    @command(0x09)  # ^I
     def HT(self, c=None):
         """Horizontal Tab"""
-        while self.col < self.width-1:
+        while self.col < self.width - 1:
             self.col += 1
             if self.tabstops[self.col]:
                 break
 
-    @command(0x0a)        # ^J
+    @command(0x0a)  # ^J
     def LF(self, c=None):
         """Line Feed"""
         if self.new_line_mode:
@@ -603,36 +613,35 @@ class Terminal:
         else:
             self.IND()
 
-    @command(0x0b)        # ^K
+    @command(0x0b)  # ^K
     def VT(self, c=None):
         """Vertical Tab"""
         self.LF(c)
 
-    @command(0x0c)        # ^L
+    @command(0x0c)  # ^L
     def FF(self, c=None):
         """Form Feed"""
         self.LF(c)
 
-    @command(0x0d)        # ^M
+    @command(0x0d)  # ^M
     def CR(self, c=None):
         """Carriage Return"""
         self.col = 0
 
-    @command(0x18)        # ^X
+    @command(0x18)  # ^X
     def CAN(self, c=None):
         """Cancel"""
         self.next_state = 'ground'
 
-    @command(0x1a)        # ^Z
+    @command(0x1a)  # ^Z
     def SUB(self, c=None):
         """Substitute"""
         self.next_state = 'ground'
 
-    @command(0x1b)        # ^[
+    @command(0x1b)  # ^[
     def ESC(self, c=None):
         """Escape"""
         self.next_state = 'escape'
-
 
     # ---------- Escape Sequences ----------
 
@@ -664,17 +673,16 @@ class Terminal:
         elif r is NoNeedToImplement:
             self.debug(1, 'ignoring escape: %s' % f.__name__)
 
-
     @escape('7')
     def DECSC(self, c=None):
         """Save Cursor"""
         self.saved_cursor[int(self.is_alt_screen())] = {
-            'pos'           : self.pos,
-            'attr'          : self.attr.copy(),
-            'autowrap'      : self.DECAWM(None),
-            'reverse_wrap'  : self.reverse_wraparound_mode(None),
-            'origin_mode'   : self.DECOM(None),
-            }
+            'pos': self.pos,
+            'attr': self.attr.copy(),
+            'autowrap': self.DECAWM(None),
+            'reverse_wrap': self.reverse_wraparound_mode(None),
+            'origin_mode': self.DECOM(None),
+        }
 
     @escape('8')
     def DECRC(self, c=None):
@@ -757,7 +765,6 @@ class Terminal:
         """Reset to Initial State"""
         self.reset()
 
-
     # ---------- Control Sequences ----------
 
     enter_control_sequence = clear_on_enter
@@ -794,23 +801,22 @@ class Terminal:
             r = f(command, param)
             if r is NotImplemented:
                 self.debug(0, 'control sequence not implemented: %s'
-                              % f.__name__)
+                           % f.__name__)
             elif r is NoNeedToImplement:
                 self.debug(1, 'ignoring control sequence: %s'
-                              % f.__name__)
+                           % f.__name__)
         except InvalidParameterListError:
             self.invalid_control_sequence()
 
     def invalid_control_sequence(self):
         """Called when the control sequence is invalid."""
         self.debug(0, 'invalid control sequence: %s'
-                % (repr(self.collected)))
+                   % (repr(self.collected)))
 
     def ignore_control_sequence(self, command, param):
         """Called when the control sequence is ignored."""
         self.debug(1, 'ignoring control sequence: %s, %s'
-                % (repr(command), repr(param)))
-
+                   % (repr(command), repr(param)))
 
     @control('@')
     def ICH(self, command=None, param=None):
@@ -827,9 +833,9 @@ class Terminal:
         n = param_list(param, 1)[0]
         self.clip_column()
         if self.row >= self.margin_top:
-            self.row = clip(self.row-n, self.margin_top, self.margin_bottom+1)
+            self.row = clip(self.row - n, self.margin_top, self.margin_bottom + 1)
         else:
-            self.row = clip(self.row-n, self.height)
+            self.row = clip(self.row - n, self.height)
 
     @control('B')
     def CUD(self, command=None, param=None):
@@ -837,22 +843,22 @@ class Terminal:
         n = param_list(param, 1)[0]
         self.clip_column()
         if self.row <= self.margin_bottom:
-            self.row = clip(self.row+n, self.margin_top, self.margin_bottom+1)
+            self.row = clip(self.row + n, self.margin_top, self.margin_bottom + 1)
         else:
-            self.row = clip(self.row+n, self.height)
+            self.row = clip(self.row + n, self.height)
 
     @control('C')
     def CUF(self, command=None, param=None):
         """Cursor Forward"""
         n = param_list(param, 1)[0]
-        self.col = clip(self.col+n, self.width)
+        self.col = clip(self.col + n, self.width)
 
     @control('D')
     def CUB(self, command=None, param=None):
         """Cursor Backward"""
         n = param_list(param, 1)[0]
         self.clip_column()
-        self.col = clip(self.col-n, self.width)
+        self.col = clip(self.col - n, self.width)
 
     @control('E')
     def CNL(self, command=None, param=None):
@@ -870,14 +876,14 @@ class Terminal:
     def CHA(self, command=None, param=None):
         """Character Position Absolute"""
         n = param_list(param, 1)[0]
-        self.col = clip(n-1, self.width)
+        self.col = clip(n - 1, self.width)
 
     @control('H')
     def CUP(self, command=None, param=None):
         """Cursor Position [row;column]"""
-        n,m = param_list(param, 1, min_length=2)[:2]
-        self.row = clip(n-1, self.height)
-        self.col = clip(m-1, self.width)
+        n, m = param_list(param, 1, min_length=2)[:2]
+        self.row = clip(n - 1, self.height)
+        self.col = clip(m - 1, self.width)
 
     @control('I')
     def CHT(self, command=None, param=None):
@@ -898,10 +904,10 @@ class Terminal:
         n = param_list(param, 0)[0]
         if n == 0:
             self.screen.clear_row(self.row, start=self.col)
-            self.screen.clear_rows(start=self.row+1)
+            self.screen.clear_rows(start=self.row + 1)
         elif n == 1:
             self.screen.clear_rows(stop=self.row)
-            self.screen.clear_row(self.row, stop=self.col+1)
+            self.screen.clear_row(self.row, stop=self.col + 1)
         elif n == 2:
             self.screen.clear()
         elif n == 3:
@@ -934,7 +940,7 @@ class Terminal:
         if n == 0:
             self.screen.clear_row(self.row, start=self.col)
         elif n == 1:
-            self.screen.clear_row(self.row, stop=self.col+1)
+            self.screen.clear_row(self.row, stop=self.col + 1)
         elif n == 2:
             self.screen.clear_row(self.row)
 
@@ -989,7 +995,7 @@ class Terminal:
     def ECH(self, command=None, param=None):
         """Erase Character"""
         n = param_list(param, 1)[0]
-        self.screen.clear_row(self.row, start=self.col, stop=self.col+n)
+        self.screen.clear_row(self.row, start=self.col, stop=self.col + n)
 
     @control('Z')
     def CBT(self, command=None, param=None):
@@ -1023,7 +1029,7 @@ class Terminal:
     def VPA(self, command=None, param=None):
         """Line Position Absolute"""
         n = param_list(param, 1)[0]
-        self.row = clip(n-1, self.height)
+        self.row = clip(n - 1, self.height)
 
     @control('e')
     def VPR(self, command=None, param=None):
@@ -1093,7 +1099,7 @@ class Terminal:
                     if m != 5:
                         # xterm stops parsing if this happens
                         self.debug(0, 'invalid 256-color attribute: %s %s %s' %
-                                (m,n,o))
+                                   (m, n, o))
                         break
                     value = o
                 else:
@@ -1113,44 +1119,44 @@ class Terminal:
                         self.attr[key] = value
 
     sgr_table = {
-            # 0 clear all attributes
-            1   : ('weight', 'bold'),
-            2   : ('weight', 'faint'),
-            3   : ('style', 'italic'),
-            4   : ('underline', 'single'),
-            5   : ('blink', 'slow'),
-            6   : ('blink', 'rapid'),
-            7   : ('inverse', True),
-            8   : ('hidden', True),
-            9   : ('strikeout', True),
-            # 10-19 font stuff
-            20  : ('style', 'fraktur'),
-            21  : ('underline', 'double'),
-            22  : ('weight', None),
-            23  : ('style', None),
-            24  : ('underline', None),
-            25  : ('blink', None),
-            # 26 reserved
-            27  : ('inverse', None),
-            28  : ('hidden', None),
-            29  : ('strikeout', None),
-            # 30-37 foreground color
-            # 38 foreground color (88- or 256-color extension)
-            39  : ('fg_color', None),
-            # 30-37 background color
-            # 38 background color (88- or 256-color extension)
-            49  : ('bg_color', None),
-            # 50 reserved
-            51  : ('frame', 'box'),
-            52  : ('frame', 'circle'),
-            53  : ('overline', True),
-            54  : ('frame', None),
-            55  : ('overline', None),
-            # 56-59 reserved
-            # 60-65 ideogram stuff
-            # 90-107 xterm 16-color support enabled (light colors)
-            # 100 xterm 16-color support disabled
-            }
+        # 0 clear all attributes
+        1: ('weight', 'bold'),
+        2: ('weight', 'faint'),
+        3: ('style', 'italic'),
+        4: ('underline', 'single'),
+        5: ('blink', 'slow'),
+        6: ('blink', 'rapid'),
+        7: ('inverse', True),
+        8: ('hidden', True),
+        9: ('strikeout', True),
+        # 10-19 font stuff
+        20: ('style', 'fraktur'),
+        21: ('underline', 'double'),
+        22: ('weight', None),
+        23: ('style', None),
+        24: ('underline', None),
+        25: ('blink', None),
+        # 26 reserved
+        27: ('inverse', None),
+        28: ('hidden', None),
+        29: ('strikeout', None),
+        # 30-37 foreground color
+        # 38 foreground color (88- or 256-color extension)
+        39: ('fg_color', None),
+        # 30-37 background color
+        # 38 background color (88- or 256-color extension)
+        49: ('bg_color', None),
+        # 50 reserved
+        51: ('frame', 'box'),
+        52: ('frame', 'circle'),
+        53: ('overline', True),
+        54: ('frame', None),
+        55: ('overline', None),
+        # 56-59 reserved
+        # 60-65 ideogram stuff
+        # 90-107 xterm 16-color support enabled (light colors)
+        # 100 xterm 16-color support disabled
+    }
 
     @control('!p')
     def DECSTR(self, command=None, param=None):
@@ -1172,7 +1178,7 @@ class Terminal:
     @control('r')
     def DECSTBM(self, command=None, param=None):
         """Set Top and Bottom Margins (Scrolling Region)"""
-        self.pos = (0,0)
+        self.pos = (0, 0)
         top, bottom = param_list(param, None, min_length=2)[:2]
         if top is None:
             top = 1
@@ -1212,32 +1218,39 @@ class Terminal:
         """Restore cursor"""
         self.DECRC()
 
-
-
     # ---------- Control Strings ----------
 
     enter_osc = clear_on_enter
     enter_dcs = clear_on_enter
     enter_sos = clear_on_enter
     enter_apc = clear_on_enter
-    enter_pm  = clear_on_enter
+    enter_pm = clear_on_enter
 
     # TODO OSC to set text parameters
-    def parse_osc(self, c): self.parse_control_string(c)
-    def parse_dcs(self, c): self.parse_control_string(c)
-    def parse_sos(self, c): self.parse_control_string(c)
-    def parse_pm (self, c): self.parse_control_string(c)
-    def parse_apc(self, c): self.parse_control_string(c)
+    def parse_osc(self, c):
+        self.parse_control_string(c)
+
+    def parse_dcs(self, c):
+        self.parse_control_string(c)
+
+    def parse_sos(self, c):
+        self.parse_control_string(c)
+
+    def parse_pm(self, c):
+        self.parse_control_string(c)
+
+    def parse_apc(self, c):
+        self.parse_control_string(c)
 
     finish_osc = None
     finish_dcs = None
     finish_sos = None
     finish_apc = None
-    finish_pm  = None
+    finish_pm = None
 
     def parse_control_string(self, c):
         # Consume the whole string and pass it to the process function.
-        if c in  (0x18, 0x1a):
+        if c in (0x18, 0x1a):
             # CAN and SUB quit the string
             self.cancel_control_string()
             # should we self.execute(c) ?
@@ -1269,8 +1282,7 @@ class Terminal:
     def ignore_control_string(self, *args):
         """Called when a control string is ignored."""
         self.debug(1, 'ignoring %s control string: %s' % (self.state,
-            repr(args)))
-
+                                                          repr(args)))
 
     # ---------- Modes ----------
 
@@ -1380,22 +1392,21 @@ class Terminal:
             self.alternate_screen_buffer_mode(False)
             self.DECRC()
 
-
     # ================================================================
     #             Things implemented by xterm but not here.
     # ================================================================
 
-    @command(0x05)       # ^E
+    @command(0x05)  # ^E
     def ENQ(self, c=None):
         """Enquiry"""
         return NoNeedToImplement
 
-    @command(0x0e)       # ^N
+    @command(0x0e)  # ^N
     def SO(self, c=None):
         """Shift Out (LS1)"""
         return NotImplemented
 
-    @command(0x0f)       # ^O
+    @command(0x0f)  # ^O
     def SI(self, c=None):
         """Shift In (LS0)"""
         return NotImplemented
@@ -1480,7 +1491,7 @@ class Terminal:
         return NotImplemented
 
     @control('>c')  # Secondary DA
-    @control('c')   # Primary DA
+    @control('c')  # Primary DA
     def DA(self, command=None, param=None):
         """Send Device Attributes"""
         return NoNeedToImplement
@@ -1762,98 +1773,96 @@ class Terminal:
         """Set bracketed paste mode."""
         return NoNeedToImplement
 
-
-
     # ================================================================
     #                  Things not implemented by xterm.
     # ================================================================
 
-    @command(0x01)        # ^A
+    @command(0x01)  # ^A
     def SOH(self, c=None):
         """Start Of Heading"""
         return NotImplemented
 
-    @command(0x02)        # ^B
+    @command(0x02)  # ^B
     def STX(self, c=None):
         """Start of TeXt"""
         return NotImplemented
 
-    @command(0x03)        # ^C
+    @command(0x03)  # ^C
     def ETX(self, c=None):
         """End of TeXt"""
         return NotImplemented
 
-    @command(0x04)        # ^D
+    @command(0x04)  # ^D
     def EOT(self, c=None):
         """End Of Transmission"""
         return NotImplemented
 
-    @command(0x06)        # ^F
+    @command(0x06)  # ^F
     def ACK(self, c=None):
         """ACKnowledge"""
         return NotImplemented
 
-    @command(0x10)        # ^P
+    @command(0x10)  # ^P
     def DLE(self, c=None):
         """Data Link Escape"""
         return NotImplemented
 
-    @command(0x11)        # ^Q
+    @command(0x11)  # ^Q
     def DC1(self, c=None):
         """Device Control 1"""
         return NotImplemented
 
-    @command(0x12)        # ^R
+    @command(0x12)  # ^R
     def DC2(self, c=None):
         """Device Control 2"""
         return NotImplemented
 
-    @command(0x13)        # ^S
+    @command(0x13)  # ^S
     def DC3(self, c=None):
         """Device Control 3"""
         return NotImplemented
 
-    @command(0x14)        # ^T
+    @command(0x14)  # ^T
     def DC4(self, c=None):
         """Device Control 4"""
         return NotImplemented
 
-    @command(0x15)        # ^U
+    @command(0x15)  # ^U
     def NAK(self, c=None):
         """Negative AcKnowledge"""
         return NotImplemented
 
-    @command(0x16)        # ^V
+    @command(0x16)  # ^V
     def SYN(self, c=None):
         """SYNchronous idle"""
         return NotImplemented
 
-    @command(0x17)        # ^W
+    @command(0x17)  # ^W
     def ETB(self, c=None):
         """End of Transmission Block"""
         return NotImplemented
 
-    @command(0x19)        # ^Y
+    @command(0x19)  # ^Y
     def EM(self, c=None):
         """End of Medium"""
         return NotImplemented
 
-    @command(0x1c)        # ^\
+    @command(0x1c)  # ^\
     def FS(self, c=None):
         """File Separator (IS4)"""
         return NotImplemented
 
-    @command(0x1d)        # ^]
+    @command(0x1d)  # ^]
     def GS(self, c=None):
         """Group Separator (IS3)"""
         return NotImplemented
 
-    @command(0x1e)        # ^^
+    @command(0x1e)  # ^^
     def RS(self, c=None):
         """Record Separator (IS2)"""
         return NotImplemented
 
-    @command(0x1f)        # ^_
+    @command(0x1f)  # ^_
     def US(self, c=None):
         """Unit Separator (IS1)"""
         return NotImplemented
@@ -2144,10 +2153,10 @@ def remove_script_lines(text):
         pass
     else:
         if script_re.match(first_line):
-            text = text[first_newline+1:]
+            text = text[first_newline + 1:]
     try:
         last_newline = text.rstrip().rindex(b'\n')
-        last_line = text[last_newline+1:].decode('utf8')
+        last_line = text[last_newline + 1:].decode('utf8')
     except (ValueError, UnicodeDecodeError):
         pass
     else:
@@ -2175,34 +2184,41 @@ def parse_geometry(s):
 
 class FileInserter:
     """Helper for SimpleConfigParser"""
+
     def __init__(self, fp, line):
         self.fp = fp
         self.line = line
+
     def readline(self):
         self.readline = self.fp.readline
         return self.line
+
     def __iter__(self):
         return itertools.chain([self.line], self.fp)
 
 
-class SimpleConfigParser (ConfigParser):
+class SimpleConfigParser(ConfigParser):
     """Configuration parser that allows a default section if none is specified
     in the configuration file.
 
     Based on SimpleConfigParser, copyright 2010 Philippe Lagadec.
     """
+
     def __init__(self, *args, **kwargs):
         self.initial_section = kwargs.pop('initial_section', 'NOSECTION')
         ConfigParser.__init__(self, *args, **kwargs)
         self.add_section(self.initial_section)
+
     def _read(self, fp, fpname):
         firstline = '[%s]\n' % self.initial_section
         fp = FileInserter(fp, firstline)
         return ConfigParser._read(self, fp, fpname)
+
     def get(self, section, *args, **kwargs):
         if section is None:
             section = self.initial_section
         return ConfigParser.get(self, section, *args, **kwargs)
+
     def set(self, section, *args, **kwargs):
         if section is None:
             section = self.initial_section
@@ -2210,33 +2226,32 @@ class SimpleConfigParser (ConfigParser):
 
 
 def main():
-
     usage = "%prog [OPTIONS] [-f FORMAT] [-g WxH] (filename|-)"
     parser = OptionParser(usage=usage)
     parser.add_option('--man', action='store_true', default=False,
-            help='show the manual page and exit')
-    parser.add_option('-f', '--format', choices=('text','html'),
-            help='output format.  Choices: text, html')
+                      help='show the manual page and exit')
+    parser.add_option('-f', '--format', choices=('text', 'html'),
+                      help='output format.  Choices: text, html')
     parser.add_option('-g', '--geometry', metavar='WxH',
-            help='use W columns and H rows in output, or "detect"')
+                      help='use W columns and H rows in output, or "detect"')
     parser.add_option('--non-script', action='store_true', default=False,
-            help='do not ignore "Script (started|done) on <date>" lines')
+                      help='do not ignore "Script (started|done) on <date>" lines')
     parser.add_option('--rc', metavar='FILE', default='~/.vt100rc',
-            help='read configuration from FILE (default %default)')
+                      help='read configuration from FILE (default %default)')
     parser.add_option('--no-rc', action='store_true', default=False,
-            help='suppress reading of configuration file')
+                      help='suppress reading of configuration file')
     parser.add_option('-q', '--quiet', action='count', default=0,
-            help='decrease debugging verbosity')
+                      help='decrease debugging verbosity')
     parser.add_option('-v', '--verbose', action='count', default=0,
-            help='increase debugging verbosity')
+                      help='increase debugging verbosity')
 
     html_group = OptionGroup(parser, "HTML Options")
     html_group.add_option('--background', metavar='COLOR',
-            help="set the default foreground color")
+                          help="set the default foreground color")
     html_group.add_option('--foreground', metavar='COLOR',
-            help="set the default background color")
+                          help="set the default background color")
     html_group.add_option('--colorscheme', metavar='SCHEME',
-            help='use the given color scheme')
+                          help='use the given color scheme')
     parser.add_option_group(html_group)
 
     options, args = parser.parse_args()
@@ -2246,10 +2261,10 @@ def main():
         return 0
 
     defaults = {
-            'format' : 'text',
-            'geometry' : '1000x1',
-            'verbosity' : '0',
-            }
+        'format': 'text',
+        'geometry': '1000x1',
+        'verbosity': '0',
+    }
     config = SimpleConfigParser(defaults)
     if not options.no_rc:
         configfile = os.path.expanduser(options.rc)
